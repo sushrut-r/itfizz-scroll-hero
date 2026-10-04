@@ -1,0 +1,1077 @@
+diff --git a/README.md b/README.md
+index 3a795b8..af40484 100644
+--- a/README.md
++++ b/README.md
+@@ -1,10 +1,11 @@
+ # ITFIZZ — Scroll-Driven Hero Section
+ 
+ A scroll-driven hero for a fictional dispatch-ops product: a **sticky stage** pins the first
+-screen while a top-down car **drives across the road in step with your scroll**, lighting up the
+-letter-spaced `W E L C O M E  I T F I Z Z` headline glyph by glyph and surfacing an impact metric
+-at each stop. Below it the page carries on as a real landing page — how it works, the metrics the
+-headline numbers come from, a customer quote, a pilot call to action, a footer.
++screen while a top-down car **drives across the road in step with your scroll**, writing the
++letter-spaced `W E L C O M E  I T F I Z Z` headline onto the asphalt as it goes — a glyph only
++comes up once the car has already passed over it — and surfacing an impact metric at each stop.
++Below it the page carries on as a real landing page — how it works, the metrics the headline
++numbers come from, a customer quote, a pilot call to action, a footer.
+ 
+ Built with **Next.js (static export) + React + Tailwind CSS + GSAP ScrollTrigger**. No other
+ animation libraries, no canvas, no WebGL.
+@@ -16,13 +17,13 @@ animation libraries, no canvas, no WebGL.
+ | **Reference** | https://paraschaturvedi.github.io/car-scroll-animation |
+ | **Stack** | Next.js 16 · React 19 · Tailwind CSS 4 · GSAP 3 (ScrollTrigger) |
+ 
+-![The first screen: eyebrow, letter-spaced headline, road with the car and the impact scoreboard](preview/hero-desktop.jpg)
++![The first screen: nothing but the car and its road](preview/hero-desktop.jpg)
+ 
+-![Scrolled: the car mid-drive, its beam switching the headline on letter by letter](preview/scroll-mid-drive.jpg)
++![Scrolled: the car mid-drive, with the words it has already passed lit up behind it](preview/scroll-mid-drive.jpg)
+ 
+ ![The metrics section: before and after for each number quoted in the hero](preview/metrics-table.jpg)
+ 
+-<img src="preview/hero-mobile.jpg" alt="Mobile layout: eyebrow, headline, road, and a 2 by 2 scoreboard" width="340" />
++<img src="preview/hero-mobile.jpg" alt="Mobile layout: the car crossing the headline on the road" width="340" />
+ 
+ > Replace the two placeholder URLs at the top with your real ones after pushing — they are the two
+ > links the assignment asks for.
+@@ -33,14 +34,16 @@ animation libraries, no canvas, no WebGL.
+ 
+ | Requirement | Where it lives |
+ | --- | --- |
+-| **Hero occupies the first screen** | `.viewport` is a `100svh` sticky stage; headline, road + car, scoreboard and HUD all live inside that single frame. |
++| **Hero occupies the first screen** | `.viewport` is a `100svh` sticky stage; the headline, the road + car, the KPI signs, the stats and the HUD all live inside that single frame. |
+ | **Letter-spaced `WELCOME ITZFIZZ`** | One `<span class="headline__letter">` per glyph, `letter-spacing: 0.1em`, a wider word gap (`app/scene.css`). |
+-| **Impact metrics / statistics** | Four KPIs as the first-screen scoreboard, each with its measurement window (`HERO_STATS`), then the same four numbers expanded with before → after values in the metrics table. |
+-| **Initial load animation** | The stage opens on nothing but the road and the car. A paused GSAP timeline fades the veil, eases the sprite in and brings the nav bar back once the car is decoded. |
+-| **The headline writes itself** | The glyphs live *on* the road, behind the car. As the beam reaches each one it ramps up from `opacity: 0`, so `WELCOME TO ITFIZZ` is drawn onto the asphalt letter by letter. Then the eyebrow, lede and the four figures land one after another at the end of the run. |
+-| **Scroll-based animation** | One scrubbed tween maps page scroll to a single progress value `0 → 1`; the car's `x` is `startX + progress × travel`. Nothing is time-based autoplay. |
+-| **Easing / interpolation** | `scrub: 0.6` gives the motion inertia decoupled from the scroll event rate; windowed `range()` helpers plus `easeOutCubic` shape every staged reveal. |
+-| **Smooth & performant** | Only `transform` + `opacity` are animated, geometry is measured once per resize, no layout reads inside the render loop. Measured **60 fps average, p95 frame 17 ms, 0 frames > 24 ms** across a scripted full-scroll pass in headless Chromium. |
++| **Impact metrics / statistics** | Four KPIs on the first screen's closing beat, each with its measurement window (`HERO_STATS`), then the same four numbers expanded with before → after values in the metrics table. |
++| **First screen** | Nothing on it but the car and its road — no nav, no headline, no stats. The nav and the lede/stats only land at the end of the run; the "scroll" cue appears only if you sit still for ~2.8 s (`HINT_DELAY_MS`). |
++| **Initial load animation** | A paused GSAP timeline fades the loading veil and eases the sprite in once the car image is decoded. Everything else waits for scroll. |
++| **The headline writes itself** | The glyphs live *on* the road, and the car drives over them. A glyph starts to come up only once the car's trailing light pool has swept past it (`glow = x − carW × 0.14`), so the car always leads and the phrase collects in its wake — never a letter ahead of the car. |
++| **Report at the end of the run** | Once the car has cleared the last word, the lede and the four figures land one after another. |
++| **Scroll-based animation** | One scrubbed tween maps page scroll to a single progress value `0 → 1`; the car's `x` is `startX + drive(t) × travel`, where the run itself is measured from the headline. Nothing is time-based autoplay. |
++| **Easing / interpolation** | `scrub: 0.6` gives the motion inertia decoupled from the scroll event rate; `driveEase()` front-loads the drive so the car settles as it finishes the last word, and windowed `range()` / `emerge()` helpers plus `easeOutCubic` shape every staged reveal. |
++| **Smooth & performant** | Only `transform` + `opacity` are animated, geometry is measured once per resize, no layout reads inside the render loop. Measured **16.67 ms average frame (locked 60 fps), p95 16.8 ms, 0 layout shifts** across a scripted full-scroll pass in headless Chromium. |
+ | **Tech stack** | HTML/CSS/JS (JSX + CSS), GSAP + ScrollTrigger, Next.js/React, Tailwind. |
+ | **Bonus** | Static export deployable to GitHub Pages (branch `/docs` **or** GitHub Actions), an asset pipeline script, a low-power fallback and an accessibility pass. |
+ 
+@@ -80,9 +83,11 @@ nightly. Save any file and Prettier formats it (`.vscode/settings.json` + `.pret
+ | I want to change… | Edit this |
+ | --- | --- |
+ | Headline / stats / card copy / nav / footer / all numbers | `lib/content.ts` — every string on the page is there |
+-| Load-time animation vs. scroll-written headline | the single `COPY_MODE` switch at the top of `components/HeroScene.tsx` (`"scroll"` or `"intro"`) |
+-| Timings: when the car starts, card reveal points, when the copy lands | the `Tunables` block at the top of `components/HeroScene.tsx` (`HERO_EXIT`, `TRAVEL`, `CARD_LEAD`, `CLOSING`, `SCRUB`, …) |
+-| Car speed, how far the beam reaches, how fast letters fade up, when cards retire | `TRAVEL`, `BEAM_REACH`, `LETTER_FADE`, `CARD_EXIT` in the same block |
++| The rhythm of the story: run, stops, report | the `Tunables` block at the top of `components/HeroScene.tsx` (`DRIVE`, `REPORT`, `SCRUB`) |
++| When a KPI sign appears, on which stretch of the run | `progress` (and `align`) on each entry in `MILESTONES` in `lib/content.ts` |
++| How far behind the car a letter lights up, how fast it fades in | `GLOW_LAG`, `GLYPH_FADE` in the same block |
++| Where the car starts and how far past the last word it stops | `RUN_INSET`, `RUN_OUT`, `driveEase()` |
++| How long before the "scroll" cue appears — or switch it off | `HINT_DELAY_MS` (`0` = immediately, `Infinity` = never) |
+ | Colours, fonts, buttons, section typography | the `@theme` tokens at the top of `app/globals.css` |
+ | Stage geometry (road thickness/position, car size, card widths, HUD) | `app/scene.css` — the `--road-*` / `--car-*` custom properties on `.viewport` |
+ | A new section below the hero | add a component in `components/`, then drop it into `app/page.tsx` |
+@@ -94,20 +99,18 @@ nightly. Save any file and Prettier formats it (`.vscode/settings.json` + `.pret
+ ```ts
+ // components/HeroScene.tsx
+ 
+-// want the classic opening (everything animates in on load) instead?
+-const COPY_MODE: "scroll" | "intro" = "scroll";   // → "intro"
+-
+-// a slower, longer story (more scroll between the same beats)
+-const JOURNEY_PADDING = 0.6;                      // → 1.2
+-
+-// make the words appear closer to the nose of the car
+-const BEAM_REACH = 0.55;                          // → 0.35 keeps letters dark a little longer
++// letters light up further behind the car (larger) or closer to its nose (smaller)
++const GLOW_LAG = 0.14;      // car lengths behind the front bumper
+ 
+ // softer, more gradual letter reveal
+-const LETTER_FADE = 0.025;                        // → 0.06
++const GLYPH_FADE = 0.04;    // → 0.08 spreads each glyph over more scroll
++
++// start the car further from the edge, or let it run further past the last word
++const RUN_INSET = 0.03;     // share of the viewport width
++const RUN_OUT = 0.3;        // car lengths
+ 
+-// hold the closing copy back a little further
+-const CLOSING = { eyebrow: { from: 0.87, … }, … }; // nudge these four values
++// hold the report back a little further
++const REPORT = { lede: { from: 0.93, … }, stats: { from: 0.945, … } };
+ ```
+ 
+ ```css
+@@ -151,22 +154,24 @@ element is written in a **single batched render pass** instead of N tweens fight
+ * **Travel** — `x = startX + t × travel`; the lane dashes, the amber wake and the headlight beam
+   are all derived from that same `x`.
+ * **The headline is written by the car** — the words sit on the road at `z-index: 2` and the car
+-  drives over them at `z-index: 3`, so it looks like the headlight is writing on the asphalt. Each
+-  glyph caches the beam value at which it starts to come on (spread evenly across the glyphs in
+-  reading order, from `offsetLeft`/`offsetTop`, which are immune to whatever transform GSAP is
+-  applying) and then eases up over a short window. The beam is deliberately short (~half a car),
+-  so the letters switch on one at a time instead of all together. A wrapped headline simply
+-  continues into line 2.
+-
+-* **The closing beat** — once the car is nearly off-stage the copy lands: the eyebrow, the product
+-  line, then the four figures one by one (`CLOSING` in `HeroScene.tsx`).
+-* **Milestone cards** — each declares `at` (a fraction of the journey). The card is *parked on the
+-  car's route* at measure time and only the arrival/departure offsets are animated.
++  drives over them at `z-index: 3`, so it looks like the car is painting the asphalt as it passes.
++  Each glyph caches its centre X (from `offsetLeft`, which is immune to whatever transform GSAP is
++  applying) and comes up when the **light pool trailing the car** — `x − carW × GLOW_LAG` — sweeps
++  past it. That pool is *behind* the car, so a letter can never switch on ahead of the bumper; the
++  letters then stay lit, so the phrase accumulates in the car's wake. On a narrow screen the
++  headline wraps and the glyphs simply light in x order, left to right, line by line.
++* **The run is measured from the words** — `measure()` takes the first and last glyph centres and
++  derives the start and end of the drive from them, so the same code works whatever you type in
++  `lib/content.ts`: the car always starts just inside the left edge and stops just past the last
++  word. If the words would push the car off the right edge, the headline is nudged left by exactly
++  the difference (clamped) so the run can finish with the whole car in frame.
++* **The report** — once the run is over the copy lands: the product line, then the four figures one
++  by one (`REPORT` in `HeroScene.tsx`), and the nav fades back in.
++* **Milestone cards** — each declares `progress` (a fraction of the run). The card's home slot is
++  where the car will be when it arrives, measured once at measure time; only the arrival offsets
++  are animated.
+ * **Speed streaks & lane rush** — a damped one-frame speed estimate feeds the streak scale and the
+   road-marking offset, so fast flicks look fast.
+-* **The story never dies** — once the first car is off-stage, a second car (no beam, since the
+-  lights are being switched *on* ahead of it, never behind) carries the last stretch of road, so
+-  the four-second scroll to the page content is never empty.
+ 
+ ### 3. Numbers instead of `if` statements
+ 
+@@ -185,8 +190,8 @@ Deliberate choices, all in `app/globals.css` / `app/scene.css`:
+   up-deltas. No neon palette, no four-colour card set, no gradient text.
+ * **Typography does the work.** Instrument Sans for the display voice, JetBrains Mono for every
+   label, figure and readout. Numbers are tabular. No decorative icon set.
+-* **Copy that is product copy, not template copy.** One eyebrow instead of a headline repeated in
+-  three places. One lede. The stack is not advertised in the UI. The numbers are internally
++* **Copy that is product copy, not template copy.** One headline, one lede — the same sentence is
++  not repeated three times with different adjectives. The stack is not advertised in the UI. The numbers are internally
+   consistent: the hero deltas, the roadside cards and the metrics table are all derived from the
+   same before/after pairs, and each carries a measurement window.
+ * **No fake nouns.** Nav links point at real sections on the page (How it works, Metrics, Field
+@@ -198,25 +203,26 @@ Deliberate choices, all in `app/globals.css` / `app/scene.css`:
+ ## Performance notes
+ 
+ * **Transforms only.** Nothing in the render loop touches `width`, `height`, `top` or `left`.
+-* **No layout reads per frame.** Element sizes, letter beam values, runway height and card
++* **No layout reads per frame.** Element sizes, glyph positions, runway height and card
+   placements are computed in `measure()` — on mount, on debounced resize, on `refreshInit`, and
+   once webfonts are ready.
+ * **Sticky instead of pinning.** `position: sticky` (not a ScrollTrigger pin) means no pin-spacer
+   divs and no layout invalidation when the scene engages.
+ * **Class toggles, not restyles.** Glyph lit/unlit is a `classList.toggle`, so the transition is
+   handled by CSS and skipped entirely when the state does not change.
+-* **Sprite work happens offline.** `tools/process-car.py` chroma-keys the render into one ~90 KB
+-  WebP; the second car reuses the same file.
+-* Verified: `avgFrameMs 16.65 · p95 17.0 ms · 0 frames > 24 ms` over a scripted full-scroll pass.
++* **Sprite work happens offline.** `tools/process-car.py` chroma-keys the render into one ~36 KB
++  WebP. It keys the green backdrop on a *bright* green-dominance test and then forces the whole
++  filled silhouette opaque, so the dark tinted glass stays solid and nothing behind the car can
++  show through it.
++* Verified: `avgFrameMs 16.67 · p95 16.8 ms · 0 layout shifts` over a scripted full-scroll pass
++  (headless Chromium, 1440 × 900).
+ 
+ ## Accessibility & motion preferences
+ 
+ * The headline has an `sr-only` copy; the glyph spans are `aria-hidden`, so screen readers get
+   “Welcome ITFIZZ”, not fourteen single letters.
+-* The car, road and cards are `aria-hidden`; every number also exists as real text in the
+-  scoreboard and as a proper `<table>` in the metrics section.
+-* On narrow screens the hero lede is visually retired (there is no room above the road without
+-  inverting the reading order) but stays in the DOM for assistive tech and crawlers.
++* The car, road and KPI cards are `aria-hidden`; every number also exists as real text in the
++  stats strip and as a proper `<table>` in the metrics section.
+ * `prefers-reduced-motion: reduce` skips the intro; the scrubbed story stays fully
+   keyboard-scrollable and no content hides behind an animation.
+ * Visible focus rings, semantic landmarks (`header` / `nav` / `main` / `footer`) and contrast
+diff --git a/app/scene.css b/app/scene.css
+index 9a38e36..263a0a1 100644
+--- a/app/scene.css
++++ b/app/scene.css
+@@ -80,24 +80,31 @@
+   will-change: transform;
+ }
+ 
+-/* the amber trail the car drags behind it — scaleX, never width */
+-.road__trail {
++/* the line the car is sitting on right now — a hairline that travels with it */
++.road__cursor {
+   position: absolute;
+-  inset-block: 0;
++  top: 0;
++  bottom: 0;
+   left: 0;
+-  width: 100%;
+-  transform-origin: 0 50%;
+-  transform: scaleX(0);
+-  background: linear-gradient(
+-    90deg,
+-    rgb(240 169 82 / 0%) 0%,
+-    rgb(240 169 82 / 4%) 58%,
+-    rgb(240 169 82 / 9%) 86%,
+-    rgb(240 169 82 / 17%) 100%
+-  );
++  width: 1px;
++  background: linear-gradient(to bottom, transparent, rgb(240 169 82 / 55%), transparent);
+   will-change: transform;
+ }
+ 
++.road__cursor-label {
++  position: absolute;
++  top: calc(100% + 10px);
++  left: 50%;
++  translate: -50% 0;
++  font-family: var(--font-mono);
++  font-size: 0.6rem;
++  letter-spacing: 0.14em;
++  color: var(--color-accent);
++  opacity: 0;
++  transition: opacity 0.25s var(--ease-out-expo);
++  white-space: nowrap;
++}
++
+ /* distance markers on both shoulders — short ticks, never full-height stripes
+  * (a full-height tick every 8.3% would line up with the lane dashes and read
+  *  as a transparency artefact) */
+@@ -291,7 +298,13 @@
+ 
+ .milestone {
+   position: absolute;
+-  translate: -50% 0; /* JS only sets `left`; GSAP animates the inner box */
++  /*
++   * `left` is measured once (HeroScene's measure pass): a sign stands where the
++   * car will be when it arrives. GSAP only animates the sign's offset from
++   * there, so nothing is ever read back from the DOM per frame.
++   */
++  left: 0;
++  translate: -50% 0;
+   width: clamp(190px, 17vw, 236px);
+ }
+ 
+@@ -326,6 +339,7 @@
+ 
+ .milestone__inner {
+   position: relative;
++  will-change: transform, opacity;
+   padding: clamp(14px, 1.1vw, 18px) clamp(15px, 1.2vw, 20px);
+   border: 1px solid var(--color-line);
+   border-radius: var(--radius-sm);
+@@ -733,8 +747,7 @@
+   }
+ 
+   .milestone {
+-    left: 50% !important;
+-    width: min(300px, 76vw);
++    width: min(300px, 74vw);
+   }
+ 
+   .milestone--above {
+diff --git a/components/HeroScene.tsx b/components/HeroScene.tsx
+index 1ae9308..cfab60a 100644
+--- a/components/HeroScene.tsx
++++ b/components/HeroScene.tsx
+@@ -13,7 +13,7 @@ import {
+   MILESTONES,
+   RAIL_LABEL_START,
+ } from "@/lib/content";
+-import { clamp, clamp01, easeOutCubic, range } from "@/lib/motion";
++import { clamp01, easeOutCubic, emerge, range } from "@/lib/motion";
+ 
+ /* ================================================================== *
+  * Tunables
+@@ -24,50 +24,64 @@ import { clamp, clamp01, easeOutCubic, range } from "@/lib/motion";
+  * ================================================================== */
+ 
+ /**
+- * What the first screen looks like, and when the copy arrives.
++ * The story has three acts, expressed as fractions of the scene's total scroll
++ * length so the rhythm survives any screen size.
+  *
+- *  "scroll" — (default) the stage opens on nothing but the road and the car.
+- *             As you scroll, the car drives and its headlight beam writes
+- *             "WELCOME TO ITFIZZ" onto the road, letter by letter; the eyebrow,
+- *             lede and KPI scoreboard then land once the run is finished.
+- *
+- *  "intro"  — the classic behaviour: eyebrow, headline, lede and scoreboard
+- *             animate in on page load, then clear as you scroll.
+- *
+- * Flip this one word to switch between the two openings.
++ *   1. the run     — the car drives, its headlights sweep the surface, and the
++ *                    words it has already passed light up behind it
++ *   2. the stops   — a road sign slides into frame with the car at each KPI
++ *   3. the report  — the run is over and the dashboard lands
+  */
+-const COPY_MODE: "scroll" | "intro" = "scroll";
+-
+ const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+ 
+-/** Act 1 — the nav steps aside so the drive has the whole stage. */
+-const HERO_EXIT = { start: 0.035, end: 0.16 } as const;
+-/** Act 2 — the car crosses the stage. */
+-const TRAVEL = { start: 0.06, end: 0.94 } as const;
+-/** How far the headlight beam reaches ahead of the nose, in car-widths. A short
+- *  beam (~half a car) means the words switch on one at a time. */
+-const BEAM_REACH = 0.55;
+-/** How much of the beam's travel a single glyph takes to fade up. */
+-const LETTER_FADE = 0.025;
+-/** Cards arrive this long before the car does, and retire this long after. */
+-const CARD_LEAD = 0.085;
+-const CARD_EXIT = 0.05;
+-/** Extra scroll above the car's own journey, as a share of a viewport. */
+-const JOURNEY_PADDING = 0.6;
+-/** Once the first car is off-stage, a second one keeps the road alive. */
+-const LOOP = { start: 0.9, end: 1 } as const;
++const DRIVE = { start: 0.05, end: 0.92 } as const;
++
++/**
++ * The run is derived from the headline itself: the car starts just inside the
++ * left edge, drives until it has cleared the last word, and stops.
++ *   · RUN_INSET — where the car rests at load, as a share of the viewport
++ *   · RUN_OUT   — how far past the last word the run ends, in car lengths
++ */
++const RUN_INSET = 0.03;
++const RUN_OUT = 0.3;
++/**
++ * The drive is front-loaded and settles at the end: the car gets moving as soon
++ * as you scroll, then eases off as it finishes writing the last word.
++ */
++const driveEase = (t: number): number => 1 - Math.pow(1 - t, 1.45);
++
++/**
++ * Where the words light up, measured from the car's nose. The pool of light sits
++ * just behind the car (0.14 car lengths), so a glyph comes on only once the car
++ * has already driven over it — never ahead of the car. Words stay lit, so the
++ * phrase accumulates in the car's wake.
++ */
++const GLOW_LAG = 0.14;
++/** One glyph comes up over this fraction of the run (≈1.5 glyphs at a time). */
++const GLYPH_FADE = 0.04;
++
++/** A sign slides in over the first / last share of its window. */
++const SIGN_RAMP = 0.18;
++/** Slightly before its slot resolves, so the sign is always in place in time. */
++const SIGN_REACH = 0.16;
++/** How far a sign slides in from as it arrives, in px. */
++const SIGN_SLIDE = 22;
++
++/** The report lands once the run is over. */
++const REPORT = {
++  lede: { from: 0.93, to: 0.985, y: 20 },
++  stats: { from: 0.945, to: 1, y: 24 },
++} as const;
++
+ /** Scrub smoothing in seconds — the inertia that decouples motion from events. */
+ const SCRUB = 0.6;
+ 
+ /**
+- * Act 4 — the closing summary (only used in "scroll" mode): the run is over, so
+- * the product line and the four numbers rise into place, one after another.
++ * The opening frame is deliberately bare — just the car and its road. The
++ * "scroll" cue only appears if the visitor has not moved for this long.
++ * Set to 0 to show it immediately, or Infinity to never show it.
+  */
+-const CLOSING = {
+-  eyebrow: { from: 0.87, to: 0.93, y: 22 },
+-  lede: { from: 0.89, to: 0.95, y: 24 },
+-  stats: { from: 0.91, to: 0.99, y: 28 },
+-} as const;
++const HINT_DELAY_MS = 2800;
+ 
+ type Letter = { el: HTMLElement; key: number };
+ 
+@@ -79,8 +93,6 @@ type Geometry = {
+   endX: number;
+   travel: number;
+   compact: boolean;
+-  /** Highest beam value the car will ever reach (≥ 1). */
+-  axisMax: number;
+   letters: Letter[];
+ };
+ 
+@@ -144,7 +156,6 @@ export default function HeroScene() {
+     const els = {
+       boot: bootRef.current,
+       sprite: spriteRef.current,
+-      eyebrow: stage.querySelector<HTMLElement>(".hero-eyebrow"),
+       letters: all<HTMLElement>(".headline__letter"),
+       lede: stage.querySelector<HTMLElement>(".hero-lede"),
+       statsStrip: stage.querySelector<HTMLElement>(".metrics-strip"),
+@@ -159,9 +170,9 @@ export default function HeroScene() {
+       ticks: all<HTMLElement>(".hud__tick"),
+       tickLabels: all<HTMLElement>(".hud__tick-label"),
+       lane: stage.querySelector<HTMLElement>(".road__lane"),
+-      trail: stage.querySelector<HTMLElement>(".road__trail"),
++      cursor: stage.querySelector<HTMLElement>(".road__cursor"),
++      cursorLabel: stage.querySelector<HTMLElement>(".road__cursor-label"),
+       streaks: all<HTMLElement>(".car-rig__streaks span"),
+-      loopRig: stage.querySelector<HTMLElement>(".car-rig--loop"),
+       cardSlots: all<HTMLElement>(".milestone"),
+       cardBoxes: all<HTMLElement>(".milestone__inner"),
+     };
+@@ -177,7 +188,6 @@ export default function HeroScene() {
+       endX: 0,
+       travel: 0,
+       compact: false,
+-      axisMax: 1,
+       letters: [],
+     };
+ 
+@@ -194,201 +204,228 @@ export default function HeroScene() {
+       geo.carW = rig.offsetWidth;
+       geo.compact = window.matchMedia("(max-width: 820px)").matches;
+ 
+-      // The car starts part-way on screen at the left and exits past the right.
+-      geo.startX = -geo.carW * 0.55;
+-      geo.endX = geo.vw + geo.carW * 0.05;
+-      geo.travel = geo.endX - geo.startX;
+-      geo.axisMax = 1 + (geo.carW * BEAM_REACH) / geo.travel;
++      // --- glyph positions, in the glow's own coordinate space -------------
++      // offset* is used (not getBoundingClientRect) because it ignores the
++      // transforms GSAP is applying, so a mid-scene resize stays correct.
++      const headline = els.letters[0]?.closest(".headline") as HTMLElement | null;
++      const keyOf = (el: HTMLElement) =>
++        (headline?.offsetLeft ?? 0) + el.offsetLeft + el.offsetWidth / 2;
++      let keys = els.letters.map(keyOf);
++      if (!keys.length) keys = [geo.vw * 0.3, geo.vw * 0.7];
++
++      // --- the run: left edge → clear of the last word --------------------
++      // Reading order is not x order once the headline wraps, so the extremes
++      // are taken over the glyphs themselves.
++      const edge = geo.vw - geo.carW - geo.vw * 0.02; // a whole car, on screen
++      const runEnd = (last: number) => last + geo.carW * RUN_OUT;
++      let endX = Math.min(runEnd(Math.max(...keys)), geo.vw * 1.06);
++
++      // If the words would push the car off the right edge, slide the headline
++      // left by the difference — as far as the left edge allows — so the run can
++      // finish with the whole car in frame.
++      let nudge = 0;
++      if (endX > edge) {
++        const leftRoom = Math.max(Math.min(...keys) - Math.max(20, geo.vw * 0.065), 0);
++        nudge = -Math.min(endX - edge, leftRoom);
++        if (nudge < -0.5) {
++          gsap.set(headline, { x: nudge });
++          keys = keys.map((key) => key + nudge);
++          endX = Math.min(runEnd(Math.max(...keys)), geo.vw * 1.06);
++        }
++      }
++
++      geo.letters = els.letters.map((el, i) => ({ el, key: keys[i] }));
++      geo.startX = geo.vw * RUN_INSET;
++      geo.endX = endX;
++      geo.travel = Math.max(geo.endX - geo.startX, geo.carW);
+ 
++      // The run gets ~one extra viewport of scroll for the report to land in.
+       const runway = geo.compact
+-        ? geo.vh * 2.1
+-        : clamp(geo.travel + geo.vh * JOURNEY_PADDING, geo.vh * 2, 5200);
++        ? Math.max(geo.travel + geo.vh * 0.9, geo.vh * 2.4)
++        : Math.min(Math.max(geo.travel + geo.vh * 0.85, geo.vh * 2.2), 5600);
+       const nextHeight = `${Math.round(runway)}px`;
+       if (scene.style.height !== nextHeight) scene.style.height = nextHeight;
+ 
+-      // --- glyph beam values --------------------------------------------
+-      // Beam value at which each glyph starts to come on: spread across the
+-      // glyphs in reading order, from just after the car enters to just before
+-      // it leaves. offsetLeft/offsetTop are used so the values are immune to
+-      // whatever transform GSAP is currently applying.
+-      const headline = els.letters[0]?.closest(".headline") as HTMLElement | null;
+-      const raw = els.letters.map((el) => ({
+-        el,
+-        x: (headline?.offsetLeft ?? 0) + el.offsetLeft + el.offsetWidth / 2,
+-      }));
+-      const count = Math.max(1, raw.length);
+-      geo.letters = raw.map((letter, i) => ({
+-        el: letter.el,
+-        key: geo.axisMax * (0.02 + (i / count) * 0.8),
+-      }));
+-
+-      // --- park the milestone cards on the car's route -------------------
++      // --- park each stop's sign ------------------------------------------
++      // A sign stands where the car will be when it arrives (measured with the
++      // same eased drive), nudged ahead of the car and clamped on screen. It is
++      // measured against the finished layout, so nothing has to be re-read per
++      // frame — GSAP only animates the sign's offset from this spot.
+       els.cardSlots.forEach((slot, i) => {
+-        const at = MILESTONES[i]?.at ?? 0.5;
+-        const centre = geo.startX + at * geo.travel + geo.carW / 2;
+-        slot.style.left = `${(centre / geo.vw) * 100}%`;
++        const milestone = MILESTONES[i];
++        if (!milestone) return;
++
++        const carAt = geo.startX + driveEase(milestone.progress) * geo.travel;
++        // the sign slides in from 22px right of its slot, so the slot has to
++        // sit that much further inside the frame
++        const margin = SIGN_SLIDE + 16;
++        const half = slot.offsetWidth / 2;
++        const centre = Math.min(
++          Math.max(carAt + geo.carW * 0.62, margin + half),
++          Math.max(geo.vw - margin - half, margin + half),
++        );
++        slot.style.left = `${Math.round(centre)}px`;
+       });
+     };
+ 
+     /* ---- the renderer: transforms, opacity and class toggles only ---- */
+     let prevT = 0;
+     let velocity = 0;
++    let lastStop = -1;
+     let lastLabel = -1;
++    let latest = 0;
++    let hintArmed = false;
+ 
+     const render = (progress: number) => {
+       if (!geo.vw) return;
+       const p = clamp01(progress);
++      latest = p;
+ 
+-      /* Act 1 — chrome: the nav steps aside for the drive, then returns */
+-      const out = range(p, HERO_EXIT.start, HERO_EXIT.end);
++      /* ---- nav: the run owns the screen, the nav returns for the report ---- */
+       if (els.hudTop) {
+-        const back = range(p, 0.9, 1);
+-        gsap.set(els.hudTop, { y: -out * 44 + back * 44, opacity: 1 - out * 0.95 });
++        const back = range(p, REPORT.stats.to - 0.02, 1);
++        gsap.set(els.hudTop, { opacity: back, y: (1 - back) * -44 });
+       }
++      /* the scroll hint only shows up if the visitor just sits there */
+       if (els.hudHint) {
+-        gsap.set(els.hudHint, { opacity: 1 - range(p, 0.02, 0.1), y: range(p, 0, 0.1) * 8 });
++        gsap.set(els.hudHint, {
++          opacity: (hintArmed ? 1 - range(p, 0.01, 0.06) : 0) * 0.9,
++          y: range(p, 0.01, 0.08) * 8,
++        });
+       }
+       if (els.hudTrace) {
+-        gsap.set(els.hudTrace, { opacity: range(p, 0.03, 0.12) });
++        gsap.set(els.hudTrace, { opacity: range(p, 0.04, 0.12) });
+       }
+ 
+-      /* Act 2 — travel and everything that hangs off the car's position */
+-      const t = range(p, TRAVEL.start, TRAVEL.end);
++      /* ---- act 1: the run ---- */
++      const t = driveEase(range(p, DRIVE.start, DRIVE.end));
+       const x = geo.startX + t * geo.travel;
+       gsap.set(rig, { x });
+ 
+-      // Damped speed estimate → streaks + road-marking rush (1 frame of lag)
++      // damped speed estimate → streaks and the road markings (1 frame of lag)
+       velocity = velocity * 0.74 + Math.min(Math.abs(t - prevT), 0.08) * 0.26;
+       prevT = t;
+       const rush = clamp01(velocity * 26);
+ 
+-      /* Act 3 — the car writes the headline.
+-       * Each glyph sits at opacity 0 until the beam reaches it, then ramps up
+-       * over a short window, so the words appear to be drawn onto the road.
+-       * The car sprite is painted above the words, which is what sells it. */
+-      const axis = (x - geo.startX + geo.carW * BEAM_REACH) / geo.travel;
++      els.streaks.forEach((streak, i) => {
++        gsap.set(streak, { scaleX: rush * (1 - i * 0.16), opacity: rush * (0.9 - i * 0.22) });
++      });
++
++      /* ---- the words light up *behind* the car -------------------------
++       * `glow` is the trailing edge of the light the car is casting. A glyph
++       * only starts coming up once that has swept past it, so nothing is ever
++       * lit ahead of the car; the glyphs stay on, so the phrase accumulates in
++       * the car's wake. */
++      const glow = x - geo.carW * GLOW_LAG;
+       for (let i = 0; i < geo.letters.length; i += 1) {
+         const letter = geo.letters[i];
+-        const on = clamp01((axis - letter.key) / LETTER_FADE);
++        const on = easeOutCubic(clamp01((glow - letter.key) / (geo.travel * GLYPH_FADE)));
+         letter.el.style.opacity = on.toFixed(2);
+-        const lit = on > 0.5;
++        const lit = on > 0.45;
+         if (lit !== letter.el.classList.contains("is-lit")) {
+           letter.el.classList.toggle("is-lit", lit);
+         }
+       }
+ 
+-      /* the loop car and its wake keep the second half of the road alive */
+-      if (els.loopRig) {
+-        const loopT = range(t, LOOP.start, LOOP.end);
+-        const fade = Math.min(
+-          range(t, LOOP.start - 0.05, LOOP.start + 0.02),
+-          1 - range(t, LOOP.end, 1.01),
+-        );
+-        gsap.set(els.loopRig, {
+-          x: -geo.carW * 0.8 + loopT * geo.travel * 0.72,
+-          opacity: Math.max(0, fade),
+-        });
+-      }
+-      if (els.trail) {
+-        gsap.set(els.trail, {
+-          scaleX: clamp01((x + geo.carW * 0.12) / geo.vw),
+-          opacity: 0.45 + clamp01(t * 3) * 0.55,
+-        });
++      /* ---- the road cursor: the line the car is sitting on right now ---- */
++      if (els.cursor) {
++        gsap.set(els.cursor, { x: x + geo.carW * 0.5, opacity: range(t, 0.01, 0.08) * 0.9 });
+       }
+       if (els.lane) {
+         gsap.set(els.lane, { x: -(t * geo.vw * 0.6 + rush * 40) });
+       }
+-      els.streaks.forEach((streak, i) => {
+-        gsap.set(streak, { scaleX: rush * (1 - i * 0.16), opacity: rush * (0.9 - i * 0.22) });
+-      });
+ 
+-      /* Act 3b — the milestones arrive as the car reaches them, then retire */
++      /* ---- act 2: road signs, arriving with the car --------------------- */
++      let active = -1;
++      let strongest = 0;
+       MILESTONES.forEach((milestone, i) => {
+         const box = els.cardBoxes[i];
+         if (!box) return;
+-        const dir = milestone.side === "above" ? -1 : 1; // cards above travel up
+-        const arrive = easeOutCubic(
+-          range(t, milestone.at - CARD_LEAD, milestone.at - CARD_LEAD * 0.25),
+-        );
+-        const leave = easeOutCubic(
+-          range(t, milestone.at + CARD_EXIT, milestone.at + CARD_EXIT * 2.6),
++
++        const on = emerge(
++          t,
++          Math.max(0, milestone.progress - SIGN_REACH),
++          milestone.progress + SIGN_REACH,
++          SIGN_RAMP,
++          0.6,
+         );
++
+         gsap.set(box, {
+-          opacity: Math.min(arrive, 1 - leave),
+-          y: (1 - arrive) * dir * 26 - leave * dir * 22,
+-          scale: 0.97 + arrive * 0.03,
++          // own layer: GSAP writes x/y/scale, CSS owns the placement
++          x: (1 - on) * SIGN_SLIDE,
++          y: (1 - on) * 26,
++          opacity: on,
++          scale: 0.97 + on * 0.03,
+         });
++
++        if (on > strongest) {
++          strongest = on;
++          active = i;
++        }
+       });
+ 
+-      /* Act 4 — the run is over: the copy lands, or (in "intro" mode) clears */
+-      if (COPY_MODE === "scroll") {
+-        const reveal = (el: HTMLElement | null, stage: { from: number; to: number; y: number }) => {
+-          if (!el) return;
+-          const on = easeOutCubic(range(p, stage.from, stage.to));
+-          gsap.set(el, { opacity: on, y: (1 - on) * stage.y });
+-        };
+-        reveal(els.eyebrow, CLOSING.eyebrow);
+-        reveal(els.lede, CLOSING.lede);
+-        // the wrapper opens with the first number, then each figure lands on its
+-        // own — the same "one by one" beat as the original load animation
+-        reveal(els.statsStrip, { ...CLOSING.stats, y: 0 });
+-        const strip = range(p, CLOSING.stats.from, CLOSING.stats.to);
+-        els.statItems.forEach((item, i) => {
+-          const on = easeOutCubic(clamp01((strip - i * 0.14) / 0.55));
+-          gsap.set(item, { opacity: on, y: (1 - on) * CLOSING.stats.y });
+-        });
+-      } else {
+-        if (els.eyebrow) gsap.set(els.eyebrow, { y: -out * 26, opacity: 1 - out * 1.9 });
+-        if (els.lede) gsap.set(els.lede, { y: out * 26, opacity: 1 - out * 1.9 });
+-        if (els.statsStrip) gsap.set(els.statsStrip, { y: out * 34, opacity: 1 - out * 1.9 });
++      // the readout and the road-side label name whatever sign is on screen
++      if (active !== lastStop) {
++        lastStop = active;
++        if (els.cursorLabel) {
++          els.cursorLabel.textContent = active === -1 ? "" : MILESTONES[active].step;
++        }
+       }
++      if (els.cursorLabel) els.cursorLabel.style.opacity = strongest > 0.15 ? "1" : "0";
++
++      /* ---- act 3: the report ------------------------------------------- */
++      const reveal = (el: HTMLElement | null, stage: { from: number; to: number; y: number }, i = 0) => {
++        if (!el) return;
++        const on = easeOutCubic(range(p, stage.from + i * 0.012, stage.to + i * 0.012));
++        gsap.set(el, { opacity: on, y: (1 - on) * stage.y });
++      };
++      reveal(els.lede, REPORT.lede);
++      reveal(els.statsStrip, { ...REPORT.stats, y: 0 });
++      const strip = range(p, REPORT.stats.from, REPORT.stats.to);
++      els.statItems.forEach((item, i) => {
++        const on = easeOutCubic(clamp01((strip - i * 0.16) / 0.5));
++        gsap.set(item, { opacity: on, y: (1 - on) * REPORT.stats.y });
++      });
+ 
+-      /* Instrumentation: the rail fills and each tick marks off its stop */
+-      if (els.railFill) gsap.set(els.railFill, { scaleX: p });
++      /* ---- instrumentation ---- */
++      if (els.railFill) gsap.set(els.railFill, { scaleX: t });
+       els.ticks.forEach((tick, i) => {
+-        const at = MILESTONES[i]?.at ?? 0.5;
+-        const passed = t >= at - 0.01;
++        const passed = t >= (MILESTONES[i]?.progress ?? 0.5) - 0.02;
+         tick.classList.toggle("is-passed", passed);
+         els.tickLabels[i]?.classList.toggle("is-passed", passed);
+       });
+       if (els.readout) {
+-        let index = -1;
+-        MILESTONES.forEach((milestone, i) => {
+-          if (t >= milestone.at - 0.02) index = i;
+-        });
++        // whatever the car is closest to naming: the sign on screen wins,
++        // otherwise the last one it has passed
++        let index = active;
++        if (index === -1) {
++          MILESTONES.forEach((milestone, i) => {
++            if (t >= milestone.progress - 0.04) index = i;
++          });
++        }
+         if (index !== lastLabel) {
+           lastLabel = index;
+-          // the label is long, so narrow screens get the short form instead
+           const short =
+             index === -1 ? RAIL_LABEL_START : `${MILESTONES[index].step}/${MILESTONES.length}`;
+           const full =
+-            index === -1
+-              ? RAIL_LABEL_START
+-              : `${MILESTONES[index].step} · ${MILESTONES[index].tag}`;
++            index === -1 ? RAIL_LABEL_START : `${MILESTONES[index].step} · ${MILESTONES[index].tag}`;
+           if (els.readoutShort) els.readoutShort.textContent = short;
+           if (els.readoutFull) els.readoutFull.textContent = full;
+         }
+       }
+     };
+ 
+-    /* ---- pre-intro states ---- */
+-    gsap.set(els.letters, { opacity: 0 }); // the beam switches them on, not the intro
+-    if (COPY_MODE === "intro") gsap.set(els.statItems, { y: 18, opacity: 0 });
+-    gsap.set(els.cardBoxes, { y: 26, opacity: 0, scale: 0.97 });
++    /* ---- the first screen holds nothing but the road and the car ---- */
++    gsap.set(els.letters, { opacity: 0 }); // the car's lights switch them on
++    gsap.set(els.cardBoxes, { opacity: 0, y: 26, scale: 0.97 });
+     gsap.set(els.streaks, { scaleX: 0, opacity: 0 });
+-    if (els.loopRig) gsap.set(els.loopRig, { opacity: 0 });
+     if (els.hudTop) gsap.set(els.hudTop, { opacity: 0, y: -12 });
++    if (els.hudHint) gsap.set(els.hudHint, { opacity: 0 });
+     if (els.hudTrace) gsap.set(els.hudTrace, { opacity: 0 });
+-    if (COPY_MODE === "scroll") {
+-      // nothing but the road and the car on the first screen
+-      if (els.eyebrow) gsap.set(els.eyebrow, { opacity: 0, y: CLOSING.eyebrow.y });
+-      if (els.lede) gsap.set(els.lede, { opacity: 0, y: CLOSING.lede.y });
+-      if (els.statsStrip) gsap.set(els.statsStrip, { opacity: 0 });
+-      gsap.set(els.statItems, { opacity: 0, y: CLOSING.stats.y });
+-    } else {
+-      if (els.eyebrow) gsap.set(els.eyebrow, { opacity: 0, y: 12 });
+-      if (els.lede) gsap.set(els.lede, { opacity: 0, y: 14 });
+-    }
++    if (els.cursor) gsap.set(els.cursor, { opacity: 0 });
++    if (els.lede) gsap.set(els.lede, { opacity: 0, y: REPORT.lede.y });
++    if (els.statsStrip) gsap.set(els.statsStrip, { opacity: 0 });
++    gsap.set(els.statItems, { opacity: 0, y: REPORT.stats.y });
+ 
+     measure();
+ 
+@@ -405,17 +442,6 @@ export default function HeroScene() {
+         0.25,
+       );
+     }
+-    intro.to(els.hudTop, { opacity: 1, y: 0, duration: 0.7 }, 0.3);
+-
+-    if (COPY_MODE === "intro") {
+-      // classic opening: copy animates in on load, then clears as you scroll
+-      intro
+-        .to(els.eyebrow, { opacity: 1, y: 0, duration: 0.7 }, 0.1)
+-        .to(els.letters, { opacity: 1, duration: 0.9, stagger: 0.04 }, 0.16)
+-        .to(els.lede, { opacity: 1, y: 0, duration: 0.8 }, 0.5)
+-        .to(els.statItems, { opacity: 1, y: 0, duration: 0.7, stagger: 0.09 }, 0.62)
+-        .to(els.hudTrace, { opacity: 1, duration: 0.7 }, 0.5);
+-    }
+     introRef.current = intro;
+ 
+     /* ---- scroll: one proxy tween drives the whole scene ---- *
+@@ -458,6 +484,15 @@ export default function HeroScene() {
+       })
+       .catch(() => {});
+ 
++    // Paint the opening frame: the car and its road, nothing else.
++    render(0);
++
++    // Nothing but the car and the road at first — the hint waits for a pause.
++    const hintTimer = window.setTimeout(() => {
++      hintArmed = true;
++      render(latest);
++    }, HINT_DELAY_MS);
++
+     // Reloading mid-page? Skip the intro and paint the scrubbed state instead.
+     if (window.scrollY > 24) {
+       intro.progress(1).pause();
+@@ -477,6 +512,7 @@ export default function HeroScene() {
+       window.removeEventListener("resize", onResize);
+       window.removeEventListener("scroll", retireIntro);
+       window.clearTimeout(resizeTimer);
++      window.clearTimeout(hintTimer);
+       ScrollTrigger.removeEventListener("refreshInit", onRefreshInit);
+       scrubbed.scrollTrigger?.kill();
+       scrubbed.kill();
+@@ -505,8 +541,11 @@ export default function HeroScene() {
+         {/* ---------- road ---------- */}
+         <div className="road" aria-hidden="true">
+           <div className="road__ticks" />
+-          <div className="road__trail" />
+           <div className="road__lane" />
++          {/* the line the car is sitting on right now */}
++          <div className="road__cursor">
++            <span className="road__cursor-label" />
++          </div>
+         </div>
+ 
+         {/* ---------- headline, drawn on the road ---------- */}
+@@ -550,24 +589,7 @@ export default function HeroScene() {
+           </picture>
+         </div>
+ 
+-        {/* ---------- second car, only on screen for the last stretch ---------- */}
+-        <div className="car-rig car-rig--loop" aria-hidden="true">
+-          <div className="car-rig__shadow" />
+-          {/* eslint-disable-next-line @next/next/no-img-element */}
+-          <img
+-            className="car-sprite"
+-            src={`${BASE_PATH}/car-top.png`}
+-            alt=""
+-            width={720}
+-            height={338}
+-            loading="lazy"
+-            decoding="async"
+-            draggable={false}
+-          />
+-        </div>
+-
+         {/* ---------- hero copy ---------- */}
+-        <p className="hero-eyebrow mono">{BRAND.eyebrow}</p>
+         <p className="hero-lede">{HERO_LEDE}</p>
+ 
+         {/* ---------- first-screen scoreboard ---------- */}
+@@ -632,8 +654,8 @@ export default function HeroScene() {
+             <div className="hud__rail-fill" />
+             {MILESTONES.map((milestone) => (
+               <span key={`tick-${milestone.step}`}>
+-                <span className="hud__tick" style={{ left: `${milestone.at * 100}%` }} />
+-                <span className="hud__tick-label" style={{ left: `${milestone.at * 100}%` }}>
++                <span className="hud__tick" style={{ left: `${milestone.progress * 100}%` }} />
++                <span className="hud__tick-label" style={{ left: `${milestone.progress * 100}%` }}>
+                   {milestone.step}
+                 </span>
+               </span>
+diff --git a/lib/content.ts b/lib/content.ts
+index f67e2b1..5b4bc81 100644
+--- a/lib/content.ts
++++ b/lib/content.ts
+@@ -52,12 +52,19 @@ export type Milestone = {
+   /** small mono line that gives the number a source */
+   context: string;
+   direction: "up" | "down";
++  /** which side of the road the sign stands on */
+   side: "above" | "below";
+   /**
+-   * Where the card belongs on the car's journey, as a fraction of the travel
+-   * (0 = car off the left edge, 1 = car off the right edge).
++   * Where the stop sits on the car's journey, as a fraction of the *report*
++   * (0 = the car has not left, 1 = the run is over). The sign slides into the
++   * frame with the car, so the first one can still "arrive" after it.
+    */
+-  at: number;
++  progress: number;
++  /**
++   * Falls back to roughly 30% into the descent when the viewport cannot fit a
++   * sign at the ideal spot (narrow screens pin every sign to one slot).
++   */
++  align: number;
+ };
+ 
+ /** The four KPIs the car drives past. */
+@@ -67,10 +74,11 @@ export const MILESTONES: Milestone[] = [
+     tag: "Pickup points",
+     value: "58%",
+     text: "More pickups logged per point once the board started sequencing them.",
+-    context: "9 kitchens · 12 weeks",
++    context: "9 kitchens",
+     direction: "up",
+     side: "above",
+-    at: 0.22,
++    progress: 0.08,
++    align: 0.28,
+   },
+   {
+     step: "02",
+@@ -79,8 +87,9 @@ export const MILESTONES: Milestone[] = [
+     text: "Fewer calls per thousand orders. Exceptions route themselves.",
+     context: "4,100 calls audited",
+     direction: "down",
+-    side: "below",
+-    at: 0.44,
++    side: "above",
++    progress: 0.38,
++    align: 0.42,
+   },
+   {
+     step: "03",
+@@ -90,7 +99,8 @@ export const MILESTONES: Milestone[] = [
+     context: "month over month",
+     direction: "up",
+     side: "above",
+-    at: 0.66,
++    progress: 0.62,
++    align: 0.34,
+   },
+   {
+     step: "04",
+@@ -99,13 +109,14 @@ export const MILESTONES: Milestone[] = [
+     text: "Lower cost per delivery at the same order volume.",
+     context: "same fleet, same SKUs",
+     direction: "down",
+-    side: "below",
+-    at: 0.84,
++    side: "above",
++    progress: 0.88,
++    align: 0.36,
+   },
+ ];
+ 
+-/** What the rail reads out as the car passes each stop. */
+-export const RAIL_LABEL_START = "Overview";
++/** What the rail reads out before the first stop. */
++export const RAIL_LABEL_START = "Run overview";
+ 
+ export const HOW_IT_WORKS = {
+   eyebrow: "How it works",
+diff --git a/lib/motion.ts b/lib/motion.ts
+index e55a71b..63c98b7 100644
+--- a/lib/motion.ts
++++ b/lib/motion.ts
+@@ -18,3 +18,26 @@ export const range = (value: number, from: number, to: number): number =>
+   from === to ? (value >= to ? 1 : 0) : clamp01((value - from) / (to - from));
+ 
+ export const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3);
++
++/**
++ * The "came and went" curve used for every road sign: 0 → 1 → 0, flat at both
++ * ends so nothing ever pops.
++ *
++ *   ramp — share of the window spent fading in   (0..1)
++ *   hold — point in the window where the fade out begins (0..1)
++ *
++ * Example: `emerge(t, 0.3, 0.45, 0.3, 0.6)` fades in over the first 30% of the
++ * window, holds until 60%, then leaves.
++ */
++export const emerge = (
++  value: number,
++  from: number,
++  to: number,
++  ramp = 0.3,
++  hold = 0.6,
++): number => {
++  const t = range(value, from, to);
++  const up = ramp > 0 ? t / ramp : 1;
++  const down = hold < 1 ? (t - hold) / (1 - hold) : t;
++  return Math.min(easeOutCubic(up), 1 - easeOutCubic(down));
++};
+diff --git a/tools/process-car.py b/tools/process-car.py
+index d199289..d99b6fd 100644
+--- a/tools/process-car.py
++++ b/tools/process-car.py
+@@ -7,11 +7,15 @@ Steps
+   1. rotate so the nose points "up" (the scene drives the car to the right, so the
+      car's own forward axis has to be vertical)
+   2. chroma-key the green backdrop (it is not perfectly flat, so we use a colour
+-     distance test plus a green-dominance test instead of an exact match)
+-  3. fill interior holes: background that is *inside* the silhouette is really the
+-     green seen through the glass, so we keep it and re-colour it to a neutral
+-     smoked-glass tone instead of punching a transparent hole
+-  4. de-fringe: erode the alpha by 1px, then feather, so no green rim survives
++     distance test plus a *bright* green-dominance test instead of an exact match).
++     The luminance guard is essential: the car's dark tinted glass is also
++     green-dominant (it reflects the backdrop) but dark, and keying it out would
++     leave see-through holes all over the body.
++  3. build a solid silhouette - close hairline cracks, fill enclosed holes, keep
++     the largest blob - then force the whole interior to full opacity. Any
++     background left inside that silhouette is the green seen *through* the
++     glass, so it is re-coloured to a neutral smoked tone instead of punched out.
++  4. de-fringe: a soft edge on the outside of the core only, so no green rim survives
+   5. crop to the car, re-pad, downscale and export WebP (2x) + PNG (1x fallback)
+ 
+ Usage: python3 tools/process-car.py
+@@ -21,7 +25,7 @@ from pathlib import Path
+ 
+ import numpy as np
+ from PIL import Image, ImageFilter
+-from scipy.ndimage import binary_erosion, binary_fill_holes
++from scipy.ndimage import binary_closing, binary_erosion, binary_fill_holes, label
+ 
+ ROOT = Path(__file__).resolve().parents[1]
+ RAW = ROOT / "raw" / "car-top-raw.png"
+@@ -29,6 +33,9 @@ PUBLIC = ROOT / "public"
+ 
+ CHROMA = np.array([0, 148, 68], dtype=np.float32)  # studio backdrop green
+ KEY_TOLERANCE = 110.0                              # per-pixel RGB distance
++# A green-dominant pixel only counts as backdrop if it is this bright. The dark
++# tinted glass (lum ~60) is excluded, which is what keeps the car solid.
++GREEN_MIN_LUMA = 95.0
+ EDGE_FEATHER = 1.1                                 # mask blur radius (px)
+ TARGET_WIDTH = 720                                 # exported sprite width (px, 2x of display)
+ PADDING_RATIO = 0.03                               # transparent margin around car
+@@ -41,32 +48,40 @@ def main() -> None:
+     # --- 2. chroma key -------------------------------------------------------
+     dist = np.sqrt(((rgb - CHROMA) ** 2).sum(axis=2))
+     r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+-    green_dominant = (g > r * 1.15) & (g > b * 1.15) & (g > 70)
++    lum = r * 0.2126 + g * 0.7152 + b * 0.0722
++    green_dominant = (g > r * 1.15) & (g > b * 1.15) & (g > 70) & (lum > GREEN_MIN_LUMA)
+     bg = (dist < KEY_TOLERANCE) | green_dominant
+ 
+-    # --- 3. interior holes are glass, not background -------------------------
+-    solid = binary_fill_holes(~bg)
+-    interior_bg = bg & solid
++    # --- 3. a solid silhouette -----------------------------------------------
++    # Close hairline cracks in the key first (they are what let the road show
++    # through the roof), fill what is enclosed, then keep the largest blob so
++    # stray specks never make it into the sprite.
++    sil = binary_closing(~bg, iterations=2)
++    sil = binary_fill_holes(sil)
++    blobs, _ = label(sil)
++    sizes = np.bincount(blobs.ravel())
++    sizes[0] = 0
++    sil = blobs == sizes.argmax()
++
++    # Background inside the silhouette is glass: recolour it, keep it opaque.
++    interior_bg = bg & sil
+     if interior_bg.any():
+-        lum = rgb[..., 0] * 0.2126 + rgb[..., 1] * 0.7152 + rgb[..., 2] * 0.0722
+         smoked = np.clip(lum[..., None] * np.array([0.62, 0.72, 0.68]), 6, 52)
+         rgb[interior_bg] = np.where(
+             (lum[interior_bg, None] < 40), smoked[interior_bg], rgb[interior_bg] * 0.35
+         )
+ 
+-    alpha = np.where(bg & ~interior_bg, 0.0, 255.0)
+-
+-    # --- 4. de-fringe: shrink then feather ----------------------------------
+-    alpha = np.asarray(
+-        Image.fromarray(alpha.astype(np.uint8)).filter(ImageFilter.MinFilter(3)),
+-        dtype=np.float32,
+-    )
++    # --- 4. de-fringe on the outside edge only ------------------------------
++    core = binary_erosion(sil, iterations=2)
+     alpha = np.asarray(
+-        Image.fromarray(alpha.astype(np.uint8)).filter(ImageFilter.GaussianBlur(EDGE_FEATHER)),
++        Image.fromarray((core * 255).astype(np.uint8)).filter(
++            ImageFilter.GaussianBlur(EDGE_FEATHER)
++        ),
+         dtype=np.float32,
+     )
+-    alpha = np.clip((alpha - 70.0) * (255.0 / 120.0), 0, 255)
+-    alpha[~binary_erosion(~bg, iterations=1)] = 0  # hard zero outside the car
++    alpha = np.clip((alpha - 60.0) * (255.0 / 130.0), 0, 255)
++    alpha[core] = 255.0  # guarantee: the interior is never see-through
++    alpha[~sil] = 0.0    # hard zero outside the car
+ 
+     out = np.dstack([rgb, alpha]).astype(np.uint8)
+     car = Image.fromarray(out, mode="RGBA")

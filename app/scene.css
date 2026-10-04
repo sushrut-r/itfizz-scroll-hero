@@ -1,0 +1,782 @@
+/* ==================================================================
+ * Scroll-driven hero scene
+ * ------------------------------------------------------------------
+ *  .scene      tall scroll runway. Its height *is* the animation's
+ *              duration: ~1 viewport of scroll = 1 act of the story.
+ *  .viewport   sticky full-height stage. Everything moves inside it,
+ *              and because `position: sticky` is used (not position:
+ *              fixed) there is no pin-spacer markup and no layout work
+ *              during scroll — the browser only composites transforms.
+ *
+ *  All geometry is declared once as custom properties so the markup,
+ *  the stylesheet and the GSAP timeline read the same numbers.
+ * ================================================================== */
+
+.scene {
+  position: relative;
+  height: 260svh; /* fallback — HeroScene measures and sets the exact runway */
+  background: var(--color-ink);
+}
+
+.viewport {
+  --road-h: clamp(112px, 16vh, 196px); /* road band thickness            */
+  --road-center: 54%; /*                 vertical centre of the road      */
+  --road-top: calc(var(--road-center) - var(--road-h) / 2);
+  --road-bottom: calc(var(--road-center) + var(--road-h) / 2);
+  --car-h: calc(var(--road-h) * 0.94); /* sprite height (car thickness)  */
+  --car-w: calc(var(--car-h) * 2.13); /*  sprite is 720 x 338 px         */
+  /* the headline lives *on* the road, so its size is derived from the road */
+  --headline-size: calc(var(--road-h) * 0.44);
+  --hud-pad: clamp(18px, 4vw, 46px);
+
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* ---------------------------------------------------------------- *
+ * Backdrop — a single soft vignette, nothing else
+ * ---------------------------------------------------------------- */
+.stage-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 84% at 50% 48%, transparent 46%, rgb(0 0 0 / 55%) 100%),
+    linear-gradient(180deg, rgb(240 169 82 / 4%) 0%, transparent 34%);
+}
+
+/* ---------------------------------------------------------------- *
+ * Road
+ * ---------------------------------------------------------------- */
+.road {
+  position: absolute;
+  inset-inline: 0;
+  top: var(--road-top);
+  height: var(--road-h);
+  background: linear-gradient(180deg, #0c0d0f 0%, #17191d 26%, #101216 74%, #090a0c 100%);
+  border-top: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
+  overflow: hidden;
+  z-index: 1;
+}
+
+/* dashed centreline: drawn once, then slid with translate (pure composite) */
+.road__lane {
+  position: absolute;
+  top: 50%;
+  left: -120%;
+  width: 220%;
+  height: 1px;
+  translate: 0 -50%;
+  background: repeating-linear-gradient(
+    90deg,
+    rgb(242 240 236 / 9%) 0 34px,
+    transparent 34px 106px
+  );
+  will-change: transform;
+}
+
+/* the line the car is sitting on right now — a hairline that travels with it */
+.road__cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, rgb(240 169 82 / 55%), transparent);
+  will-change: transform;
+}
+
+.road__cursor-label {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  translate: -50% 0;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  color: var(--color-accent);
+  opacity: 0;
+  transition: opacity 0.25s var(--ease-out-expo);
+  white-space: nowrap;
+}
+
+/* distance markers on both shoulders — short ticks, never full-height stripes
+ * (a full-height tick every 8.3% would line up with the lane dashes and read
+ *  as a transparency artefact) */
+.road__ticks {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(90deg, rgb(242 240 236 / 26%) 0 1px, transparent 1px 100%),
+    linear-gradient(90deg, rgb(242 240 236 / 26%) 0 1px, transparent 1px 100%);
+  background-size:
+    8.333% 5px,
+    8.333% 5px;
+  background-position:
+    0 0,
+    0 100%;
+  background-repeat: repeat-x, repeat-x;
+  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------- *
+ * Car rig: sprite + ground shadow + headlight beam + speed streaks.
+ * GSAP only ever translates the rig.
+ * ---------------------------------------------------------------- */
+.car-rig {
+  position: absolute;
+  top: var(--road-center);
+  left: 0;
+  width: var(--car-w);
+  height: var(--car-h);
+  translate: 0 -50%;
+  z-index: 3;
+  will-change: transform;
+}
+
+.car-rig__shadow {
+  position: absolute;
+  inset: 22% 4%;
+  border-radius: 50%;
+  background: radial-gradient(50% 50% at 50% 50%, rgb(0 0 0 / 65%), transparent 72%);
+  filter: blur(8px);
+}
+
+.car-sprite {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.car-rig__beam {
+  position: absolute;
+  top: 50%;
+  left: 86%;
+  width: 170%;
+  height: 46%;
+  translate: 0 -50%;
+  background: linear-gradient(90deg, rgb(255 226 176 / 16%), rgb(255 226 176 / 0%) 72%);
+  clip-path: polygon(0 46%, 100% 0, 100% 100%, 0 54%);
+  mix-blend-mode: screen;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.car-rig__streaks {
+  position: absolute;
+  top: 16%;
+  bottom: 16%;
+  right: 98%;
+  width: 54%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.car-rig__streaks span {
+  display: block;
+  height: 1px;
+  background: linear-gradient(90deg, rgb(242 240 236 / 0%), rgb(242 240 236 / 55%));
+  transform-origin: 100% 50%;
+  transform: scaleX(0);
+  will-change: transform;
+}
+
+/* ---------------------------------------------------------------- *
+ * Headline — one <span> per glyph so the beam can light them one at
+ * a time. Unlit letters sit in low-contrast grey; the beam promotes
+ * them to paper white. clamp() keeps the line inside the viewport
+ * from 320px phones up to 4K.
+ * ---------------------------------------------------------------- */
+/* The headline is drawn on the road itself and sits *behind* the car, so the
+ * car appears to write the words as it drives past. z-index: road(1) → words(2)
+ * → car(3). */
+.headline {
+  position: absolute;
+  inset-inline: 0;
+  top: var(--road-center);
+  translate: 0 -50%;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0 clamp(0.5rem, 1.4vw, 1.3rem); /* word gap, wider than the tracking */
+  padding-inline: var(--hud-pad);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.headline__word {
+  display: flex;
+  align-items: baseline;
+}
+
+.headline__letter {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: var(--headline-size);
+  font-weight: 500;
+  line-height: 1.06;
+  letter-spacing: 0.1em;
+  color: #4c4c53; /* unlit — the beam promotes it to paper white */
+  transition: color 0.34s var(--ease-out-expo);
+  will-change: transform, opacity;
+}
+
+.headline__letter.is-lit {
+  color: var(--color-paper);
+  text-shadow: 0 0 34px rgb(240 169 82 / 14%);
+}
+
+.headline__break {
+  display: none;
+}
+
+.hero-lede {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(var(--road-bottom) + clamp(24px, 3.6vh, 42px));
+  max-width: min(62ch, 100%);
+  margin-inline: auto;
+  padding-inline: var(--hud-pad);
+  text-align: center;
+  font-size: clamp(0.86rem, 1.02vw, 0.98rem);
+  line-height: 1.65;
+  color: var(--color-muted);
+  z-index: 4;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* ---------------------------------------------------------------- *
+ * Milestone cards — quiet surfaces, hairline borders, mono labels.
+ * The accent is a 2px rule that only signals direction.
+ * ---------------------------------------------------------------- */
+.milestones {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.milestone {
+  position: absolute;
+  /*
+   * `left` is measured once (HeroScene's measure pass): a sign stands where the
+   * car will be when it arrives. GSAP only animates the sign's offset from
+   * there, so nothing is ever read back from the DOM per frame.
+   */
+  left: 0;
+  translate: -50% 0;
+  width: clamp(190px, 17vw, 236px);
+}
+
+.milestone--above {
+  /* clears the eyebrow strip above the road */
+  bottom: calc(100% - var(--road-top) + clamp(88px, 13vh, 124px));
+}
+
+.milestone--below {
+  top: calc(var(--road-bottom) + clamp(20px, 3.4vh, 40px));
+}
+
+/* the hairline that ties the card to the point on the road it describes */
+.milestone__stem {
+  position: absolute;
+  left: 50%;
+  width: 1px;
+  height: clamp(26px, 4.4vh, 52px);
+  background: linear-gradient(to bottom, var(--color-line-strong), transparent);
+}
+
+.milestone--above .milestone__stem {
+  top: 100%;
+  height: clamp(38px, 6vh, 68px);
+  background: linear-gradient(to top, var(--color-line-strong), transparent);
+}
+
+.milestone--below .milestone__stem {
+  bottom: 100%;
+  background: linear-gradient(to bottom, var(--color-line-strong), transparent);
+}
+
+.milestone__inner {
+  position: relative;
+  will-change: transform, opacity;
+  padding: clamp(14px, 1.1vw, 18px) clamp(15px, 1.2vw, 20px);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: rgb(19 19 21 / 82%);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 24px 60px -30px rgb(0 0 0 / 90%);
+  will-change: transform, opacity;
+}
+
+/* direction rule: amber = up, cool grey = down */
+.milestone__inner::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  background: var(--color-accent);
+}
+
+.milestone--down .milestone__inner::before {
+  background: var(--color-down);
+}
+
+.milestone__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.milestone__step {
+  color: var(--color-paper);
+}
+
+.milestone__value {
+  display: block;
+  font-size: clamp(1.7rem, 2.3vw, 2.3rem);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 10px;
+}
+
+.milestone__text {
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #b9b9c0;
+}
+
+.milestone__context {
+  display: block;
+  margin-top: 14px;
+  padding-top: 11px;
+  border-top: 1px solid var(--color-line);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* ---------------------------------------------------------------- *
+ * First-screen scoreboard — hairline-divided columns, mono labels
+ * ---------------------------------------------------------------- */
+.metrics-strip {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(var(--road-bottom) + clamp(104px, 15.5vh, 158px));
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-width: 1040px;
+  margin-inline: auto;
+  padding-top: clamp(16px, 2.2vh, 24px);
+  padding-inline: var(--hud-pad);
+  border-top: 1px solid var(--color-line);
+  z-index: 4;
+  pointer-events: none;
+}
+
+.stat {
+  padding-inline: clamp(10px, 1.6vw, 22px);
+  border-left: 1px solid var(--color-line);
+  will-change: transform, opacity;
+}
+
+.stat:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.stat__label {
+  display: block;
+  margin-bottom: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.stat__value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: clamp(1.25rem, 2.1vw, 1.95rem);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat__arrow {
+  font-size: 0.7em;
+  color: var(--color-accent);
+}
+
+.stat__window {
+  display: block;
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  color: #6f6f77;
+}
+
+/* ---------------------------------------------------------------- *
+ * HUD
+ * ---------------------------------------------------------------- */
+.hud {
+  position: absolute;
+  inset-inline: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-inline: var(--hud-pad);
+  z-index: 6;
+}
+
+.hud--top {
+  top: clamp(20px, 4.4vh, 44px);
+}
+
+.hud__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+}
+
+.hud__brand svg {
+  flex: none;
+}
+
+.hud__links {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2.4vw, 30px);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.hud__links a {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.22s var(--ease-out-expo);
+}
+
+.hud__links a:hover {
+  color: var(--color-paper);
+}
+
+.hud__cta {
+  padding: 9px 14px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-xs);
+  color: var(--color-paper) !important;
+  transition:
+    background-color 0.22s var(--ease-out-expo),
+    border-color 0.22s var(--ease-out-expo),
+    color 0.22s var(--ease-out-expo);
+}
+
+.hud__cta:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #1a1004 !important;
+}
+
+/* bottom instrument: eyebrow — rail with ticks — live readout */
+.hud__trace {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(34px, 5vh, 56px);
+  translate: -50% 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(14px, 2.4vw, 28px);
+  width: min(880px, calc(100% - var(--hud-pad) * 2));
+  z-index: 6;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.hud__trace-label {
+  white-space: nowrap;
+}
+
+.hud__rail {
+  position: relative;
+  height: 24px;
+}
+
+.hud__rail-line {
+  position: absolute;
+  top: 11px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--color-line-strong);
+}
+
+.hud__rail-fill {
+  position: absolute;
+  top: 11px;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  background: linear-gradient(90deg, rgb(240 169 82 / 45%), var(--color-accent));
+  will-change: transform;
+}
+
+.hud__tick {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 24px;
+  background: var(--color-line-strong);
+  will-change: transform, opacity;
+}
+
+.hud__tick-label {
+  position: absolute;
+  top: 15px;
+  translate: -50% 0;
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  color: #6f6f77;
+  will-change: color;
+}
+
+.hud__tick.is-passed {
+  background-color: var(--color-accent);
+}
+
+.hud__tick-label.is-passed {
+  color: var(--color-accent);
+}
+
+.hud__readout {
+  text-align: right;
+  color: var(--color-paper);
+  white-space: nowrap;
+}
+
+/* the readout shows the short form on narrow screens and the long one on wide */
+.hud__readout-full {
+  display: none;
+}
+
+@media (min-width: 821px) {
+  .hud__readout-full {
+    display: inline;
+  }
+
+  .hud__readout-short {
+    display: none;
+  }
+}
+
+.hud__hint {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(10px, 1.8vh, 20px);
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #6f6f77;
+  z-index: 6;
+  will-change: opacity, transform;
+}
+
+.hud__hint-arrow {
+  display: inline-block;
+  animation: nudge 2s var(--ease-out-expo) infinite;
+}
+
+@keyframes nudge {
+  0%,
+  100% {
+    translate: 0 0;
+    opacity: 0.45;
+  }
+  50% {
+    translate: 0 4px;
+    opacity: 1;
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ * Boot veil — quiet, no mascot copy
+ * ---------------------------------------------------------------- */
+.boot {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: var(--color-ink);
+}
+
+.boot__inner {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #6f6f77;
+}
+
+.boot__track {
+  width: min(180px, 36vw);
+  height: 1px;
+  background: var(--color-line);
+  overflow: hidden;
+}
+
+.boot__fill {
+  height: 100%;
+  width: 100%;
+  transform-origin: 0 50%;
+  background: var(--color-accent);
+}
+
+/* ================================================================== *
+ * Narrow screens — headline and lede stack above the road, cards share
+ * one slot so they reveal one at a time, scoreboard goes 2 x 2.
+ * ================================================================== */
+@media (max-width: 820px) {
+  .viewport {
+    --road-center: 55%;
+    --road-h: clamp(88px, 13vh, 148px);
+    --headline-size: calc(var(--road-h) * 0.38);
+  }
+
+  .headline {
+    align-content: center;
+    line-height: 1.06;
+  }
+
+  .headline__break {
+    display: block;
+    flex-basis: 100%;
+    height: 0;
+  }
+
+  .hero-lede {
+    top: calc(var(--road-bottom) + clamp(20px, 3.4vh, 34px));
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+
+  .milestone {
+    width: min(300px, 74vw);
+  }
+
+  .milestone--above {
+    bottom: auto;
+    top: 9%;
+  }
+
+  .milestone--below {
+    top: calc(var(--road-bottom) + 20px);
+  }
+
+  .milestone__stem {
+    display: none;
+  }
+
+  .metrics-strip {
+    top: calc(var(--road-bottom) + clamp(88px, 12vh, 128px));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px 0;
+    max-width: 520px;
+  }
+
+  .stat:nth-child(odd) {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .hud__links a:not(.hud__cta) {
+    display: none;
+  }
+
+  .hud__trace {
+    grid-template-columns: minmax(0, 1fr) auto;
+    bottom: clamp(30px, 4.6vh, 46px);
+  }
+
+  .hud__trace-label {
+    display: none;
+  }
+
+  .hud__hint {
+    bottom: clamp(8px, 1.4vh, 16px);
+  }
+}
+
+@media (max-width: 420px) {
+  .stat__label {
+    font-size: 0.56rem;
+  }
+
+  .stat__value {
+    font-size: 1.15rem;
+  }
+
+  .stat__window {
+    font-size: 0.56rem;
+  }
+
+  .hud__readout {
+    min-width: 0;
+  }
+}

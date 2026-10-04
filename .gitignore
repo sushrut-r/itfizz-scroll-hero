@@ -1,0 +1,15 @@
+# ---- dependencies ----
+node_modules/
+
+# ---- build output ----
+# `docs/` is intentionally NOT ignored: it holds the static export that GitHub
+# Pages serves from the branch (see README → Deploying to GitHub Pages).
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# ---- local scratch ----
+raw/check-*.jpg
+.env*
+.DS_Store
